@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kalkulator HPP Developer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: kalkulator kerja, lugas, angka dulu.
+   IDEA: panel kendali biaya proyek — readout HPP per tipe unit dominan, strip input di sampingnya.
+   PICTURE: readout HPP besar per tipe + batang komposisi biaya + meter margin proyek terhadap target.
+   COLOUR and TYPE: panel baja #d5dbe0, hitam, putih, merah alarm #e8251a; malam #16191c. Inter Tight 600 + Inter.
+   LAYOUT: readout 40% kiri (sticky di layar lebar), grup input kanan; di bawah: ringkasan per tipe, rincian, skenario. */
+:root{color-scheme:light;--bg:#d5dbe0;--panel:#fff;--ink:#0b0d0f;--mute:#4a535b;--line:#b9c1c8;--red:#e8251a;--field:#f3f5f7;--hit:#fde9e7}
+@supports(color:light-dark(#000,#fff)){:root{color-scheme:light dark;--bg:light-dark(#d5dbe0,#16191c);--panel:light-dark(#fff,#1f2327);--ink:light-dark(#0b0d0f,#eef1f3);--mute:light-dark(#4a535b,#9aa4ad);--line:light-dark(#b9c1c8,#30363c);--field:light-dark(#f3f5f7,#121518);--hit:light-dark(#fde9e7,#3a1b19)}}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Inter,system-ui,sans-serif;overflow-x:clip}
+h1,h2,legend,.big{font-family:"Inter Tight",Inter,sans-serif;font-weight:600}
+.band{padding:clamp(20px,3vw,40px) max(4vw,16px)}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:clamp(28px,4vw,40px);line-height:1.05;margin:0 0 6px;text-wrap:balance}
+.sub{color:var(--mute);margin:0;font-size:15px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+button{font:600 15px Inter,sans-serif;min-height:44px;padding:0 16px;border-radius:6px;border:1px solid var(--ink);background:var(--panel);color:var(--ink);cursor:pointer}
+button.pri{background:var(--ink);color:var(--bg)}
+button.x{min-height:40px;padding:0 12px;border-color:var(--line);color:var(--mute)}
+button:focus-visible,input:focus-visible{outline:3px solid var(--red);outline-offset:2px}
+.grid{display:grid;grid-template-columns:minmax(0,4fr) minmax(0,6fr);gap:16px;align-items:start}
+.read{background:#0b0d0f;color:#fff;border-radius:10px;padding:clamp(18px,2.5vw,28px);position:sticky;top:12px}
+.lbl{color:#aab3bb;font-size:14px}
+.trow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:baseline;padding:10px 0;border-bottom:1px solid #30363c}
+.trow span{color:#aab3bb;font-size:14px}.trow small{grid-column:1/-1;color:#aab3bb;font-size:13px}
+.trow b{font:600 clamp(24px,3vw,32px)/1.1 "Inter Tight",sans-serif;white-space:nowrap;font-variant-numeric:tabular-nums}
+.big{font-size:clamp(38px,5.4vw,58px);line-height:1;margin:6px 0 4px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kpis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;margin:16px 0;padding:14px 0;border-bottom:1px solid #30363c}
+.kpis b{display:block;font:600 19px "Inter Tight",sans-serif;white-space:nowrap;font-variant-numeric:tabular-nums}
+.kpis span{color:#aab3bb;font-size:13px}
+.stackbar{display:flex;height:30px;border-radius:4px;overflow:hidden;margin:8px 0 10px;background:#2a2f34}
+.stackbar i{display:block;height:100%;transition:width .35s}
+.leg{display:grid;gap:4px;font-size:14px}
+.leg div{display:grid;grid-template-columns:12px minmax(0,1fr) auto auto;gap:8px;align-items:center}
+.leg em{width:12px;height:12px;border-radius:2px;display:block}
+.leg s{text-decoration:none;color:#aab3bb;min-width:3.2em;text-align:right}
+.leg u{text-decoration:none;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.mtrack{position:relative;height:14px;background:#2a2f34;border-radius:7px;margin:8px 0 4px}
+.mfill{position:absolute;inset:0 auto 0 0;border-radius:7px;background:#fff;transition:width .35s}
+.mtick{position:absolute;top:-5px;bottom:-5px;width:3px;background:var(--red)}
+.mrow{display:flex;justify-content:space-between;font-size:13px;color:#aab3bb}
+.flag{margin-top:12px;font-size:14px;padding:10px 12px;border-radius:6px;background:#1c2125}
+.flag.bad{background:var(--red);color:#fff}
+.inputs{display:grid;gap:16px}
+fieldset{border:0;margin:0;padding:16px;background:var(--panel);border-radius:10px}
+legend{float:left;width:100%;font-size:18px;margin-bottom:10px}
+.fields{clear:both;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px}
+.full{grid-column:1/-1}
+label{display:block;font-size:14px;color:var(--mute)}
+.inp{display:flex;align-items:center;margin-top:4px;background:var(--field);border:1px solid var(--line);border-radius:6px}
+.inp input{flex:1;width:100%;font:500 16px Inter,sans-serif;color:var(--ink);background:transparent;border:0;padding:10px;min-height:44px;text-align:right;font-variant-numeric:tabular-nums}
+.inp input.t{text-align:left}
+.inp small{padding-right:10px;color:var(--mute);font-size:13px;white-space:nowrap}
+.hint{font-size:13px;color:var(--mute);margin-top:4px}
+.types{clear:both;display:grid;gap:10px}
+.tc{border:1px solid var(--line);border-radius:8px;padding:12px}
+.tc.off .fields{display:none}
+.tc .tog{display:flex;align-items:center;gap:10px;font:600 16px Inter,sans-serif;color:var(--ink);cursor:pointer;min-height:36px}
+.tc .tog input{width:22px;height:22px;accent-color:var(--red)}
+.tc .fields{margin-top:10px}
+.segb{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.segb button{flex:1 1 auto;font-size:14px}
+.rg{margin-top:14px}
+.rg h3{font:600 15px Inter,sans-serif;margin:0 0 6px;display:flex;justify-content:space-between;gap:8px}
+.rg h3 span{white-space:nowrap;font-variant-numeric:tabular-nums}
+.ri{display:grid;grid-template-columns:minmax(0,2.2fr) minmax(0,1fr) 64px minmax(0,1.4fr) minmax(0,1.3fr) 40px;gap:6px;align-items:center;margin-bottom:6px}
+.ri .inp{margin:0}.ri .inp input{padding:8px;min-height:40px;font-size:15px}
+.ri .j{text-align:right;font-size:14px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rh{font-size:12px;color:var(--mute)}
+.add{margin-top:2px;font-size:14px;min-height:40px}
+.rtot{display:flex;justify-content:space-between;font-weight:700;border-top:2px solid var(--ink);margin-top:12px;padding-top:8px}
+section.card{background:var(--panel);border-radius:10px;padding:clamp(16px,2.5vw,24px);margin-top:16px}
+h2{font-size:24px;line-height:1.1;margin:0 0 6px}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:15px}
+th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+th{font-weight:600;color:var(--mute);font-size:13px}
+th:first-child,td:first-child{text-align:left;white-space:normal}
+tr.tot td{font-weight:700;border-top:2px solid var(--ink)}
+tr.hit td{background:var(--hit)}
+.scroll{overflow-x:auto}
+.note{font-size:13px;color:var(--mute);margin-top:10px}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+@media(max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.read{position:static}}
+@media(max-width:600px){.fields{grid-template-columns:minmax(0,1fr)}.ri{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px;padding-bottom:8px;border-bottom:1px solid var(--line)}.ri .u{grid-column:1/3}.ri .j{grid-column:1/3;text-align:left}.rh{display:none}table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:9em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:8.5em;margin-inline-start:-9em;white-space:normal;color:var(--mute)}.stack td:empty{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
+</head>
+<body>
+<header class="band"><div class="wrap">
+  <h1>Kalkulator HPP Developer</h1>
+  <p class="sub">Pilih tipe unit (subsidi, komersil, ruko — satu atau gabungan), isi biaya, HPP per unit dihitung langsung.</p>
+  <div class="bar"><button id="bCopy" type="button">Salin ringkasan</button><button id="bClr" type="button">Kosongkan input</button></div>
+</div></header>
+
+<main class="band" style="padding-top:8px"><div class="wrap">
+<div class="grid">
+  <aside class="read" aria-live="polite">
+    <div class="lbl" id="rNama">HPP per unit</div>
+    <div id="rTypes"></div>
+    <div class="kpis">
+      <div><b id="kTot">–</b><span>total HPP proyek</span></div>
+      <div><b id="kRev">–</b><span>total penjualan</span></div>
+      <div><b id="kMg">–</b><span>margin kotor proyek</span></div>
+      <div><b id="kMk">–</b><span>setelah pemasaran</span></div>
+    </div>
+    <div class="lbl">Komposisi HPP proyek</div>
+    <div class="stackbar" id="sb"></div>
+    <div class="leg" id="leg"></div>
+    <div style="margin-top:18px">
+      <div class="lbl">Margin kotor proyek terhadap target</div>
+      <div class="mtrack"><div class="mfill" id="mf"></div><div class="mtick" id="mt"></div></div>
+      <div class="mrow"><span>0%</span><span id="mtl">target</span><span>40%</span></div>
+    </div>
+    <div class="flag" id="flag"></div>
+  </aside>
+  <form class="inputs" id="f" onsubmit="return false"></form>
+</div>
+
+<section class="card">
+  <h2>Ringkasan per tipe unit</h2>
+  <table class="stack"><thead><tr><th>Tipe</th><th>Unit</th><th>HPP / unit</th><th>HPP / m² LB</th><th>Harga jual</th><th>Margin kotor</th><th>Setelah pemasaran</th><th>Harga jual min. target</th></tr></thead><tbody id="tps"></tbody></table>
+</section>
+
+<section class="card">
+  <h2>Rincian komponen HPP</h2>
+  <div class="scroll"><table><thead id="rinH"></thead><tbody id="rin"></tbody></table></div>
+  <p class="note">Tanah, perizinan, BPHTB dan pekerjaan kawasan dibagi ke tiap tipe sesuai porsi luas kavling (unit × LT). Bila kawasan diisi per unit, dibagi rata per unit. PLN termasuk pekerjaan kawasan.</p>
+</section>
+
+<section class="card">
+  <h2>Skenario jumlah unit</h2>
+  <p class="sub">Ubah jumlah satu tipe, tipe lain tetap. Baris merah = jumlah pertama yang membuat margin kotor proyek mencapai target.</p>
+  <div class="segb" id="svb" style="margin-top:10px"></div>
+  <div class="scroll"><table><thead><tr><th>Unit</th><th>HPP / unit tipe ini</th><th>Margin tipe ini</th><th>Margin proyek</th><th>Rasio kavling</th></tr></thead><tbody id="sk"></tbody></table></div>
+  <p class="note">Rasio kavling = Σ(unit × LT) ÷ lahan bruto. Menambah unit lewat penataan ulang siteplan hanya relevan bila siteplan belum disahkan dan tetap memenuhi porsi PSU.</p>
+</section>
+<p class="note">HPP = tanah + perizinan + BPHTB & legal + pekerjaan kawasan (termasuk PLN) + bangunan unit. Belum termasuk funding, overhead dan pajak. Input tersimpan otomatis di peramban ini.</p>
+</div></main>
+<div id="toast"></div>
+
+<script>
+{
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const nf=(x,d=0)=>Number.isFinite(x)?x.toLocaleString('id-ID',{minimumFractionDigits:d,maximumFractionDigits:d}):'–';
+const rp=x=>'Rp '+nf(Math.round(x));
+const jt=x=>'Rp '+nf(x/1e6,1)+' jt';
+const M=x=>Math.abs(x)>=1e9?'Rp '+nf(x/1e9,2)+' M':jt(x);
+const pc=x=>nf(x*100,1)+'%';
+const parse=s=>{s=String(s).trim().replace(/\s/g,'').replace(/\./g,'').replace(',','.');const v=parseFloat(s);return Number.isFinite(v)?v:0};
+const fv=v=>v?nf(v,(v%1)?2:0):'';
+
+const TY=[['sub','Unit subsidi'],['kom','Unit komersil'],['ruko','Unit ruko']];
+const GR=['Persiapan','Pekerjaan lahan','Infrastruktur (jalan & saluran)','Utilitas (PLN, air bersih, taman)','Sarana & prasarana (rumah ibadah, gerbang, taman)'];
+const DI=()=>[[0,'Pekerjaan persiapan','ls'],[1,'Pekerjaan lahan (cut & fill)','m³'],[2,'Jalan','m²'],[2,'Saluran','m'],[3,'PLN','unit'],[3,'Air bersih','ls'],[3,'Taman','m²'],[4,'Rumah ibadah','unit'],[4,'Gerbang','unit'],[4,'Taman','m²']].map(([g,u,s])=>({g,u,v:0,s,h:0}));
+const T0=on=>({on,N:0,LB:0,LT:0,P:0,hB:0});
+const D0=()=>({nama:'',L:0,hT:0,hI:0,bp:0,lg:0,ef:0,km:'unit',Ku:0,Km:0,K:0,mk:0,tg:0,sv:'sub',t:{sub:T0(true),kom:T0(false),ruko:T0(false)},d:DI()});
+const KM={unit:['Per unit','Rp/unit'],m2:['Per m² lahan','Rp/m²'],total:['Total proyek','Rp'],detail:['Detail per item','']};
+const KF={unit:'Ku',m2:'Km',total:'K'};
+let S=D0();
+try{const sv=JSON.parse(localStorage.getItem('hppDev4')||'null');if(sv&&sv.t&&sv.d)S={...D0(),...sv,t:{...D0().t,...sv.t}}}catch(e){}
+
+const fld=(k,lab,u,hint,cls='',txt=false)=>`<div class="${cls}"><label for="i_${k}">${esc(lab)}</label><div class="inp"><input id="i_${k}" data-k="${k}" ${txt?'data-t="1" class="t"':'inputmode="decimal"'} autocomplete="off" value="${esc(txt?get(k):fv(get(k)))}"><small>${esc(u)}</small></div>${hint?`<div class="hint">${esc(hint)}</div>`:''}</div>`;
+function get(k){return k.split('.').reduce((o,p)=>o?.[p],S)}
+function set(k,v){const p=k.split('.'),l=p.pop();p.reduce((o,q)=>o[q],S)[l]=v}
+
+function renderForm(){
+  const kh=S.km==='detail'?renderRAB():fld(KF[S.km],'Pekerjaan kawasan (termasuk PLN)',KM[S.km][1],{unit:'dikali jumlah seluruh unit',m2:'dikali luas lahan bruto',total:'total proyek'}[S.km],'full');
+  $('f').innerHTML=`
+  <fieldset><legend>Proyek</legend><div class="fields">${fld('nama','Nama proyek','','','',true)}${fld('L','Luas lahan bruto','m²')}</div></fieldset>
+  <fieldset><legend>Tipe unit</legend><div class="types">${TY.map(([k,n])=>`<div class="tc ${S.t[k].on?'':'off'}" id="tc_${k}"><label class="tog"><input type="checkbox" data-k="t.${k}.on" ${S.t[k].on?'checked':''}>${n}</label><div class="fields">
+    ${fld(`t.${k}.N`,'Jumlah unit','unit')}${fld(`t.${k}.P`,'Harga jual per unit','Rp')}${fld(`t.${k}.LB`,'Luas bangunan (LB)','m²')}${fld(`t.${k}.LT`,'Luas tanah kavling (LT)','m²')}${fld(`t.${k}.hB`,'Biaya bangun','Rp/m² LB','','full')}</div></div>`).join('')}</div></fieldset>
+  <fieldset><legend>Tanah &amp; perizinan</legend><div class="fields">${fld('hT','Harga tanah','Rp/m²','dari lahan bruto')}${fld('hI','Perizinan all-in','Rp/m²','dari lahan bruto')}${fld('bp','BPHTB lahan','% tanah')}${fld('lg','Legal & sertifikat pecahan','Rp/unit')}</div></fieldset>
+  <fieldset><legend>Pekerjaan kawasan</legend><div class="fields"><div class="full"><label>Cara isi biaya kawasan</label><div class="segb">${Object.entries(KM).map(([k,v])=>`<button type="button" data-km="${k}" class="${S.km===k?'pri':''}" aria-pressed="${S.km===k}">${v[0]}</button>`).join('')}</div></div>${kh}</div></fieldset>
+  <fieldset><legend>Konstruksi, penjualan &amp; target</legend><div class="fields">${fld('ef','Efisiensi biaya bangun','%','potongan untuk semua tipe')}${fld('mk','Biaya pemasaran','% harga')}${fld('tg','Target margin kotor','%')}</div></fieldset>`;
+}
+function renderRAB(){
+  return `<div class="full">${GR.map((g,gi)=>`<div class="rg"><h3>${gi+1}. ${esc(g)}<span id="dg_${gi}">–</span></h3>
+  <div class="ri rh"><span>Uraian</span><span>Volume</span><span>Satuan</span><span>Harga satuan</span><span style="text-align:right">Jumlah</span><span></span></div>
+  ${S.d.map((it,i)=>it.g!==gi?'':`<div class="ri"><div class="inp u"><input class="t" data-t="1" data-k="d.${i}.u" value="${esc(it.u)}" aria-label="Uraian"></div><div class="inp"><input inputmode="decimal" data-k="d.${i}.v" value="${fv(it.v)}" aria-label="Volume ${esc(it.u)}"></div><div class="inp"><input class="t" data-t="1" data-k="d.${i}.s" value="${esc(it.s)}" aria-label="Satuan"></div><div class="inp"><input inputmode="decimal" data-k="d.${i}.h" value="${fv(it.h)}" aria-label="Harga satuan ${esc(it.u)}"></div><div class="j" id="dj_${i}">–</div><button type="button" class="x" data-del="${i}" aria-label="Hapus ${esc(it.u)}">✕</button></div>`).join('')}
+  <button type="button" class="add" data-add="${gi}">+ Tambah item</button></div>`).join('')}
+  <div class="rtot"><span>Total pekerjaan kawasan</span><span id="dTot">–</span></div></div>`;
+}
+
+function model(s,ov){
+  const t={};TY.forEach(([k])=>{t[k]={...s.t[k]};if(ov&&ov[k]!=null)t[k].N=ov[k]});
+  const act=TY.filter(([k])=>t[k].on&&t[k].N>0).map(([k])=>k);
+  const NT=act.reduce((a,k)=>a+t[k].N,0),LTs=act.reduce((a,k)=>a+t[k].N*t[k].LT,0);
+  const tanah=s.L*s.hT,izin=s.L*s.hI,bphtb=tanah*s.bp/100;
+  const dsum=s.d.reduce((a,x)=>a+x.v*x.h,0);
+  const kaw=s.km==='unit'?s.Ku*NT:s.km==='m2'?s.Km*s.L:s.km==='total'?s.K:dsum;
+  const R={act,NT,LTs,tanah,izin,bphtb,kaw,dsum,tp:{},tot:0,rev:0,bang:0,legal:0};
+  act.forEach(k=>{const x=t[k],sh=LTs?x.N*x.LT/LTs:x.N/NT;
+    const a={tanah:tanah*sh,izin:izin*sh,bphtb:bphtb*sh,kaw:s.km==='unit'?s.Ku*x.N:kaw*sh,bang:x.N*x.LB*x.hB*(1-s.ef/100),legal:x.N*s.lg};
+    a.tot=a.tanah+a.izin+a.bphtb+a.kaw+a.bang+a.legal;a.hpp=a.tot/x.N;a.N=x.N;a.P=x.P;a.LB=x.LB;a.LT=x.LT;a.rev=x.N*x.P;
+    a.mg=(x.P-a.hpp)/x.P;a.mk=(x.P*(1-s.mk/100)-a.hpp)/x.P;R.tp[k]=a;R.tot+=a.tot;R.rev+=a.rev;R.bang+=a.bang;R.legal+=a.legal});
+  R.mg=(R.rev-R.tot)/R.rev;R.mk=(R.rev*(1-s.mk/100)-R.tot)/R.rev;return R;
+}
+const COL=['#ffffff','#e8251a','#8d99a4','#5b6670','#c9d0d6'];
+const nm=k=>TY.find(t=>t[0]===k)[1];
+
+function calc(){
+  const s=S,R=model(s),tgt=s.tg/100;
+  try{localStorage.setItem('hppDev4',JSON.stringify(S))}catch(e){}
+  if(s.km==='detail'){S.d.forEach((x,i)=>{const e=$('dj_'+i);if(e)e.textContent=rp(x.v*x.h)});GR.forEach((g,gi)=>{const e=$('dg_'+gi);if(e)e.textContent=rp(S.d.filter(x=>x.g===gi).reduce((a,x)=>a+x.v*x.h,0))});if($('dTot'))$('dTot').textContent=rp(R.dsum)}
+  $('rNama').textContent='HPP per unit'+(s.nama?' · '+s.nama:'');
+  const ok=R.act.length&&R.tot>0&&R.act.every(k=>R.tp[k].P>0);
+  if(!ok){
+    $('rTypes').innerHTML='<div class="big">Rp –</div>';['kTot','kRev','kMg','kMk'].forEach(i=>$(i).textContent='–');
+    $('sb').innerHTML='';$('leg').innerHTML='';$('mf').style.width='0';$('mt').style.left='0';
+    $('flag').className='flag';$('flag').textContent='Aktifkan minimal satu tipe unit, isi jumlah unit dan harga jualnya, serta komponen biaya untuk melihat HPP.';
+    $('tps').innerHTML=$('rin').innerHTML=$('sk').innerHTML='<tr><td colspan="8">Belum ada data.</td></tr>';$('rinH').innerHTML='';$('svb').innerHTML='';window._sum='Belum ada data HPP.';return}
+  $('rTypes').innerHTML=R.act.length===1?`<div class="big">${rp(R.tp[R.act[0]].hpp)}</div><div class="lbl">${nm(R.act[0])} · ${nf(R.tp[R.act[0]].N)} unit · ${rp(R.tp[R.act[0]].hpp/R.tp[R.act[0]].LB)}/m² LB</div>`
+    :R.act.map(k=>{const a=R.tp[k];return `<div class="trow"><span>${nm(k)} · ${nf(a.N)} unit</span><b>${rp(a.hpp)}</b><small>margin ${pc(a.mg)} · ${rp(a.hpp/a.LB)}/m² LB</small></div>`}).join('');
+  $('kTot').textContent=M(R.tot);$('kRev').textContent=M(R.rev);$('kMg').textContent=M(R.rev-R.tot)+' · '+pc(R.mg);$('kMk').textContent=pc(R.mk);
+  const kdas=s.km==='unit'?rp(s.Ku)+' × '+nf(R.NT)+' unit':s.km==='m2'?nf(s.L)+' m² × '+rp(s.Km):s.km==='total'?'total proyek':'RAB '+S.d.length+' item';
+  const rows=[['Bangunan unit','bang','per tipe: LB × biaya bangun'],['Tanah','tanah',nf(s.L)+' m² × '+rp(s.hT)],['Pekerjaan kawasan','kaw',kdas],['Perizinan','izin',nf(s.L)+' m² × '+rp(s.hI)],['BPHTB & legal','bl',nf(s.bp,1)+'% tanah + '+rp(s.lg)+'/unit']];
+  const tv=(k,a)=>k==='bl'?a.bphtb+a.legal:a[k];
+  const pv=k=>R.act.reduce((x,t)=>x+tv(k,R.tp[t]),0);
+  $('sb').innerHTML=rows.map((r,i)=>`<i style="width:${pv(r[1])/R.tot*100||0}%;background:${COL[i]}"></i>`).join('');
+  $('leg').innerHTML=rows.map((r,i)=>pv(r[1])>0?`<div><em style="background:${COL[i]}"></em><span>${r[0]}</span><u>${M(pv(r[1]))}</u><s>${pc(pv(r[1])/R.tot)}</s></div>`:'').join('');
+  const sc=v=>Math.max(0,Math.min(1,v/0.4))*100;
+  $('mf').style.width=sc(R.mg)+'%';$('mt').style.left='calc('+sc(tgt)+'% - 1px)';$('mtl').textContent='target '+nf(s.tg,1)+'%';
+  const fl=$('flag'),gap=R.tot-R.rev*(1-tgt);
+  if(R.mg>=tgt){fl.className='flag';fl.textContent='Margin kotor proyek '+pc(R.mg)+' sudah di atas target '+pc(tgt)+'.'}
+  else{fl.className='flag bad';fl.textContent='HPP proyek perlu turun '+M(gap)+' untuk mencapai margin '+pc(tgt)+'.'}
+  $('tps').innerHTML=R.act.map(k=>{const a=R.tp[k];return `<tr><td>${nm(k)}</td><td>${nf(a.N)}</td><td>${rp(a.hpp)}</td><td>${rp(a.hpp/a.LB)}</td><td>${rp(a.P)}</td><td>${pc(a.mg)}</td><td>${pc(a.mk)}</td><td>${rp(a.hpp/(1-tgt))}</td></tr>`}).join('')+
+    (R.act.length>1?`<tr class="tot"><td>Proyek</td><td>${nf(R.NT)}</td><td>${rp(R.tot/R.NT)}</td><td></td><td>${M(R.rev)}</td><td>${pc(R.mg)}</td><td>${pc(R.mk)}</td><td></td></tr>`:'');
+  $('rinH').innerHTML=`<tr><th>Komponen</th><th>Dasar hitung</th><th>Total</th><th>Porsi</th>${R.act.map(k=>`<th>${nm(k)} / unit</th>`).join('')}</tr>`;
+  $('rin').innerHTML=rows.map(r=>`<tr><td>${r[0]}</td><td>${r[2]}</td><td>${M(pv(r[1]))}</td><td>${pc(pv(r[1])/R.tot)}</td>${R.act.map(k=>`<td>${rp(tv(r[1],R.tp[k])/R.tp[k].N)}</td>`).join('')}</tr>`).join('')+
+    `<tr class="tot"><td>Total HPP</td><td>${nf(R.NT)} unit</td><td>${M(R.tot)}</td><td>100%</td>${R.act.map(k=>`<td>${rp(R.tp[k].hpp)}</td>`).join('')}</tr>`;
+  if(!R.act.includes(S.sv))S.sv=R.act[0];
+  $('svb').innerHTML=R.act.length>1?R.act.map(k=>`<button type="button" data-sv="${k}" class="${S.sv===k?'pri':''}">${nm(k)}</button>`).join(''):'';
+  const k=S.sv,N0=R.tp[k].N,step=Math.max(1,Math.round(N0/60)*5||1),list=[];
+  for(let i=-2;i<=10;i++){const n=N0+i*step;if(n>0)list.push(n)}
+  let hit=null;for(let n=N0;n<=N0*3;n++){if(model(s,{[k]:n}).mg>=tgt){hit=n;break}}
+  if(hit&&!list.includes(hit))list.push(hit);list.sort((a,b)=>a-b);
+  $('sk').innerHTML=list.map(n=>{const m=model(s,{[k]:n}),a=m.tp[k];return `<tr class="${n===hit?'hit':''}"><td>${nf(n)}${n===N0?' (rencana)':''}</td><td>${rp(a.hpp)}</td><td>${pc(a.mg)}</td><td>${pc(m.mg)}</td><td>${pc(m.LTs/s.L)}</td></tr>`}).join('');
+  window._sum=[`HPP ${s.nama||'proyek'} — ${nf(R.NT)} unit`,
+    ...R.act.map(k=>{const a=R.tp[k];return `- ${nm(k)}: ${nf(a.N)} unit, HPP ${rp(a.hpp)}/unit, harga ${rp(a.P)}, margin ${pc(a.mg)}`}),
+    ...rows.map(r=>`  ${r[0]}: ${M(pv(r[1]))} (${pc(pv(r[1])/R.tot)})`),
+    ...(s.km==='detail'?S.d.filter(x=>x.v*x.h).map(x=>`    · ${x.u}: ${nf(x.v,2)} ${x.s} × ${rp(x.h)} = ${rp(x.v*x.h)}`):[]),
+    `Total HPP ${M(R.tot)} | penjualan ${M(R.rev)} | margin kotor ${pc(R.mg)}, setelah pemasaran ${pc(R.mk)}`].join('\n');
+}
+const f=$('f');
+f.addEventListener('input',e=>{const el=e.target,k=el.dataset.k;if(!k)return;
+  if(el.type==='checkbox'){set(k,el.checked);$('tc_'+k.split('.')[1]).classList.toggle('off',!el.checked)}
+  else set(k,el.dataset.t?el.value:parse(el.value));calc()});
+f.addEventListener('focusout',e=>{const el=e.target;if(el.dataset.k&&!el.dataset.t&&el.type!=='checkbox')el.value=fv(get(el.dataset.k))});
+f.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  if(b.dataset.km){S.km=b.dataset.km;renderForm();calc()}
+  else if(b.dataset.add){S.d.push({g:+b.dataset.add,u:'Item baru',v:0,s:'ls',h:0});renderForm();calc()}
+  else if(b.dataset.del){S.d.splice(+b.dataset.del,1);renderForm();calc()}});
+$('svb').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&b.dataset.sv){S.sv=b.dataset.sv;calc()}});
+const toast=t=>{const e=$('toast');e.textContent=t;e.style.opacity=1;setTimeout(()=>e.style.opacity=0,1800)};
+$('bClr').addEventListener('click',()=>{S=D0();renderForm();calc();toast('Input dikosongkan')});
+$('bCopy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(window._sum);toast('Ringkasan disalin')}catch(e){toast('Peramban menolak salin')}});
+renderForm();calc();
+window._t={get S(){return S},set S(v){S=v},model,calc};
+}
+</script>
+</body>
+</html>
