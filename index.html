@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-   
+
 <link rel="icon" type="image/png" href="/calculator.png">
 <link rel="apple-touch-icon" href="/calculator.png">
-
+   
 <title>Kalkulator HPP Developer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -91,7 +91,7 @@ tr.tot td{font-weight:700;border-top:2px solid var(--ink)}
 tr.hit td{background:var(--hit)}
 .scroll{overflow-x:auto}
 .note{font-size:13px;color:var(--mute);margin-top:10px}
-#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);max-width:90vw;text-align:center;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 @media(max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.read{position:static}}
 @media(max-width:600px){.fields{grid-template-columns:minmax(0,1fr)}.ri{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px;padding-bottom:8px;border-bottom:1px solid var(--line)}.ri .u{grid-column:1/3}.ri .j{grid-column:1/3;text-align:left}.rh{display:none}table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:9em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:8.5em;margin-inline-start:-9em;white-space:normal;color:var(--mute)}.stack td:empty{display:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -102,7 +102,7 @@ tr.hit td{background:var(--hit)}
 <header class="band"><div class="wrap">
   <h1>Kalkulator HPP Developer</h1>
   <p class="sub">Pilih tipe unit (subsidi, komersil, ruko — satu atau gabungan), isi biaya, HPP per unit dihitung langsung.</p>
-  <div class="bar"><button id="bCopy" type="button">Salin ringkasan</button><button id="bClr" type="button">Kosongkan input</button></div>
+  <div class="bar"><button id="bXls" type="button" class="pri">Simpan Excel</button><button id="bPdf" type="button" class="pri">Simpan PDF</button><button id="bCopy" type="button">Salin ringkasan</button><button id="bClr" type="button">Kosongkan input</button></div>
 </div></header>
 
 <main class="band" style="padding-top:8px"><div class="wrap">
@@ -265,9 +265,120 @@ f.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   else if(b.dataset.add){S.d.push({g:+b.dataset.add,u:'Item baru',v:0,s:'ls',h:0});renderForm();calc()}
   else if(b.dataset.del){S.d.splice(+b.dataset.del,1);renderForm();calc()}});
 $('svb').addEventListener('click',e=>{const b=e.target.closest('button');if(b&&b.dataset.sv){S.sv=b.dataset.sv;calc()}});
-const toast=t=>{const e=$('toast');e.textContent=t;e.style.opacity=1;setTimeout(()=>e.style.opacity=0,1800)};
+let tt;const toast=(t,ms=2200)=>{const e=$('toast');e.textContent=t;e.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>e.style.opacity=0,ms)};
 $('bClr').addEventListener('click',()=>{S=D0();renderForm();calc();toast('Input dikosongkan')});
 $('bCopy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(window._sum);toast('Ringkasan disalin')}catch(e){toast('Peramban menolak salin')}});
+
+/* ===== Ekspor Excel & PDF ===== */
+let dl=null;
+try{if(window.claude&&window.claude.use)window.claude.use('downloads').then(x=>{dl=x}).catch(()=>{})}catch(e){}
+const JS={};
+const loadJs=src=>JS[src]||(JS[src]=new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{delete JS[src];no(new Error('Gagal memuat pustaka, periksa koneksi internet'))};document.head.appendChild(s)}));
+const fname=ext=>{const d=new Date(),z=n=>String(n).padStart(2,'0');return 'HPP_'+((S.nama||'Proyek').replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_')||'Proyek')+'_'+d.getFullYear()+z(d.getMonth()+1)+z(d.getDate())+'.'+ext};
+async function saveFile(name,blob){
+  if(dl){try{await dl.save({filename:name,data:blob});toast('File '+name+' disimpan')}
+    catch(e){const c=e&&e.code;toast(c==='declined'?'Penyimpanan dibatalkan':c==='host_unavailable'?'Aplikasi ini tidak bisa menyimpan file. Buka di peramban atau komputer.':'Gagal menyimpan: '+((e&&e.message)||c||'tidak diketahui'),4000)}return}
+  const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);toast('File '+name+' diunduh');
+}
+const ready=()=>{const R=model(S);if(!(R.act.length&&R.tot>0&&R.act.every(k=>R.tp[k].P>0))){toast('Belum ada data untuk disimpan',3000);return null}return R};
+
+function buildXlsx(R){
+  const X=window.XLSX,wb=X.utils.book_new(),MF='#,##0',PF='0.0%';
+  const sheet=()=>({});
+  const put=(ws,a,v,f,z)=>{const c=(typeof v==='number')?{t:'n',v}:{t:'s',v:String(v??'')};if(f){c.f=f;if(typeof v!=='number'){c.t='n';c.v=0}}if(z)c.z=z;ws[a]=c};
+  const fin=(ws,ref,cols)=>{ws['!ref']=ref;ws['!cols']=cols.map(w=>({wch:w}))};
+  const ROW={sub:19,kom:20,ruko:21};
+  // Input
+  const I=sheet();put(I,'A1','INPUT — Kalkulator HPP Developer (ubah angka di kolom C dan tabel tipe unit)');
+  const inp=[['Nama proyek',S.nama||'',''],['Luas lahan bruto',S.L,'m²'],['Harga tanah',S.hT,'Rp/m² lahan bruto'],['Perizinan all-in',S.hI,'Rp/m² lahan bruto'],['BPHTB lahan',S.bp,'% dari tanah'],['Legal & sertifikat pecahan',S.lg,'Rp/unit'],['Efisiensi biaya bangun',S.ef,'% potongan semua tipe'],['Biaya pemasaran',S.mk,'% harga jual'],['Target margin kotor',S.tg,'%'],['Cara isi kawasan',S.km,'isi: unit / m2 / total / detail'],['Kawasan per unit',S.Ku,'Rp/unit (mode unit)'],['Kawasan per m² lahan',S.Km,'Rp/m² (mode m2)'],['Kawasan total proyek',S.K,'Rp (mode total)']];
+  inp.forEach((x,i)=>{const r=i+3;put(I,'B'+r,x[0]);put(I,'C'+r,x[1],null,typeof x[1]==='number'?MF:null);put(I,'D'+r,x[2])});
+  put(I,'B17','Tipe unit (Aktif: 1 = ya, 0 = tidak)');
+  ['Tipe','Aktif','Jumlah unit','LB (m²)','LT (m²)','Harga jual (Rp)','Biaya bangun (Rp/m² LB)'].forEach((t,i)=>put(I,String.fromCharCode(66+i)+'18',t));
+  TY.forEach(([k,n])=>{const r=ROW[k],t=S.t[k];put(I,'B'+r,n);put(I,'C'+r,t.on?1:0);[t.N,t.LB,t.LT,t.P,t.hB].forEach((v,i)=>put(I,String.fromCharCode(68+i)+r,v,null,MF))});
+  fin(I,'A1:H21',[2,34,18,30,10,10,18,24]);
+  // RAB Kawasan
+  const K=sheet();put(K,'A1','RAB PEKERJAAN KAWASAN (termasuk PLN) — dipakai bila Input!C12 = detail');
+  ['No','Kelompok','Uraian','Volume','Satuan','Harga satuan (Rp)','Jumlah (Rp)'].forEach((t,i)=>put(K,String.fromCharCode(65+i)+'3',t));
+  const items=[...S.d].sort((a,b)=>a.g-b.g);let r=4;
+  items.forEach((it,i)=>{put(K,'A'+r,i+1);put(K,'B'+r,GR[it.g]);put(K,'C'+r,it.u);put(K,'D'+r,it.v,null,'#,##0.00');put(K,'E'+r,it.s);put(K,'F'+r,it.h,null,MF);put(K,'G'+r,it.v*it.h,`D${r}*F${r}`,MF);r++});
+  const last=r-1,tr=r;put(K,'C'+tr,'TOTAL PEKERJAAN KAWASAN');put(K,'G'+tr,R.dsum,items.length?`SUM(G4:G${last})`:'0',MF);
+  put(K,'B'+(tr+2),'Rekap per kelompok');
+  GR.forEach((g,i)=>{const rr=tr+3+i,sub=S.d.filter(x=>x.g===i).reduce((a,x)=>a+x.v*x.h,0);put(K,'B'+rr,g);put(K,'G'+rr,sub,items.length?`SUMIF($B$4:$B$${last},B${rr},$G$4:$G$${last})`:'0',MF)});
+  fin(K,'A1:G'+(tr+3+GR.length),[5,44,32,12,9,18,20]);
+  // HPP
+  const H=sheet();put(H,'A1','HPP PER TIPE UNIT — semua angka berumus dari sheet Input dan RAB Kawasan');
+  const kawF=`IF(Input!C12="unit",Input!C13*B3,IF(Input!C12="m2",Input!C14*Input!C4,IF(Input!C12="total",Input!C15,'RAB Kawasan'!G${tr})))`;
+  [['Total unit aktif',R.NT,'SUMPRODUCT(Input!C19:C21,Input!D19:D21)'],['Σ unit × LT (m²)',R.LTs,'SUMPRODUCT(Input!C19:C21,Input!D19:D21,Input!F19:F21)'],['Tanah',R.tanah,'Input!C4*Input!C5'],['Perizinan',R.izin,'Input!C4*Input!C6'],['BPHTB',R.bphtb,'B5*Input!C7/100'],['Pekerjaan kawasan',R.kaw,kawF]]
+    .forEach((x,i)=>{put(H,'A'+(i+3),x[0]);put(H,'B'+(i+3),x[1],x[2],MF)});
+  put(H,'A10','Komponen');['B','C','D'].forEach((c,i)=>put(H,c+'10',TY[i][1]));put(H,'E10','Total proyek');
+  const lines=[
+    [11,'Jumlah unit',(c,ir)=>`Input!C${ir}*Input!D${ir}`,'n',a=>a.N,true,MF],
+    [12,'Porsi luas kavling',(c,ir)=>`IF($B$4>0,${c}11*Input!F${ir}/$B$4,0)`,'p',a=>a.N*a.LT/R.LTs,true,PF],
+    [13,'Tanah',c=>`${c}12*$B$5`,'m',a=>a.tanah,true,MF],
+    [14,'Perizinan',c=>`${c}12*$B$6`,'m',a=>a.izin,true,MF],
+    [15,'BPHTB',c=>`${c}12*$B$7`,'m',a=>a.bphtb,true,MF],
+    [16,'Pekerjaan kawasan',c=>`IF(Input!$C$12="unit",Input!$C$13*${c}11,${c}12*$B$8)`,'m',a=>a.kaw,true,MF],
+    [17,'Bangunan unit',(c,ir)=>`${c}11*Input!E${ir}*Input!H${ir}*(1-Input!$C$9/100)`,'m',a=>a.bang,true,MF],
+    [18,'Legal & sertifikat',c=>`${c}11*Input!$C$8`,'m',a=>a.legal,true,MF],
+    [19,'TOTAL HPP',c=>`SUM(${c}13:${c}18)`,'m',a=>a.tot,true,MF],
+    [20,'HPP per unit',c=>`IF(${c}11>0,${c}19/${c}11,0)`,'m',a=>a.hpp,'f',MF],
+    [21,'HPP per m² LB',(c,ir)=>`IF(${c}11>0,${c}20/Input!E${ir},0)`,'m',a=>a.hpp/a.LB,false,MF],
+    [22,'Harga jual per unit',(c,ir)=>`Input!G${ir}`,'m',a=>a.P,false,MF],
+    [23,'Total penjualan',c=>`${c}11*${c}22`,'m',a=>a.rev,true,MF],
+    [24,'Margin kotor',c=>`IF(${c}23>0,(${c}23-${c}19)/${c}23,0)`,'p',a=>a.mg,'f',PF],
+    [25,'Margin setelah pemasaran',c=>`IF(${c}23>0,(${c}23*(1-Input!$C$10/100)-${c}19)/${c}23,0)`,'p',a=>a.mk,'f',PF],
+    [26,'Harga jual minimal untuk target',c=>`IF(Input!$C$11<100,${c}20/(1-Input!$C$11/100),0)`,'m',a=>a.hpp/(1-S.tg/100),false,MF]];
+  lines.forEach(([rw,lab,fn,,vf,tot,z])=>{put(H,'A'+rw,lab);
+    TY.forEach(([k],i)=>{const c='BCD'[i],a=R.tp[k];put(H,c+rw,a?vf(a):0,fn(c,ROW[k]),z)});
+    if(tot===true)put(H,'E'+rw,rw===12?1:R.act.reduce((s,k)=>s+vf(R.tp[k]),0),`SUM(B${rw}:D${rw})`,z);
+    else if(tot==='f'){const v=rw===20?R.tot/R.NT:rw===24?R.mg:R.mk;put(H,'E'+rw,v,fn('E',0),z)}});
+  put(H,'A28','HPP proyek perlu turun untuk target');put(H,'E28',Math.max(0,R.tot-R.rev*(1-S.tg/100)),'MAX(0,E19-E23*(1-Input!C11/100))',MF);
+  put(H,'A30','Tanah, perizinan, BPHTB dan kawasan dibagi sesuai porsi luas kavling (unit × LT); kawasan mode unit dibagi rata per unit. Belum termasuk funding, overhead dan pajak.');
+  fin(H,'A1:E30',[34,20,20,20,20]);
+  X.utils.book_append_sheet(wb,H,'HPP');X.utils.book_append_sheet(wb,I,'Input');X.utils.book_append_sheet(wb,K,'RAB Kawasan');
+  wb.Workbook={CalcPr:{fullCalcOnLoad:true}};
+  return new Blob([X.write(wb,{bookType:'xlsx',type:'array'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function buildPdf(R){
+  const Q=s=>String(s).replace(/²/g,'2').replace(/³/g,'3');
+  const doc=new window.jspdf.jsPDF({unit:'mm',format:'a4'}),W=doc.internal.pageSize.getWidth();
+  const d=new Date().toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+  doc.setFillColor(11,13,15);doc.rect(0,0,W,30,'F');doc.setTextColor(255);doc.setFont('helvetica','bold');doc.setFontSize(17);doc.text(Q('Laporan HPP'+(S.nama?' — '+S.nama:'')),14,14);
+  doc.setFont('helvetica','normal');doc.setFontSize(10);doc.text(nf(R.NT)+' unit · lahan bruto '+nf(S.L)+' m2 · '+d,14,22);
+  doc.setTextColor(0);
+  const kp=[['Total HPP proyek',M(R.tot)],['Total penjualan',M(R.rev)],['Margin kotor proyek',pc(R.mg)],['Setelah pemasaran '+nf(S.mk,1)+'%',pc(R.mk)]];
+  kp.forEach((x,i)=>{const X=14+i*((W-28)/4);doc.setFontSize(8);doc.setTextColor(90);doc.text(x[0],X,40);doc.setFontSize(13);doc.setTextColor(0);doc.setFont('helvetica','bold');doc.text(x[1],X,47);doc.setFont('helvetica','normal')});
+  const base={theme:'grid',styles:{fontSize:8.5,cellPadding:1.8},headStyles:{fillColor:[11,13,15],textColor:255},margin:{left:14,right:14}};
+  const ra=n=>{const o={};for(let i=1;i<n;i++)o[i]={halign:'right'};return o};
+  doc.setFontSize(12);doc.setFont('helvetica','bold');doc.text('Ringkasan per tipe unit',14,58);doc.setFont('helvetica','normal');
+  doc.autoTable({...base,startY:61,head:[['Tipe','Unit','HPP / unit','HPP / m2 LB','Harga jual','Margin kotor','Stl. pemasaran','Harga min. target']],
+    body:R.act.map(k=>{const a=R.tp[k];return [Q(nm(k)),nf(a.N),rp(a.hpp),rp(a.hpp/a.LB),rp(a.P),pc(a.mg),pc(a.mk),rp(a.hpp/(1-S.tg/100))]}),columnStyles:ra(8)});
+  const rows=[['Bangunan unit','bang'],['Tanah','tanah'],['Pekerjaan kawasan (termasuk PLN)','kaw'],['Perizinan','izin'],['BPHTB & legal','bl']];
+  const tv=(k,a)=>k==='bl'?a.bphtb+a.legal:a[k],pv=k=>R.act.reduce((x,t)=>x+tv(k,R.tp[t]),0);
+  let y=doc.lastAutoTable.finalY+9;doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('Rincian komponen HPP',14,y);doc.setFont('helvetica','normal');
+  doc.autoTable({...base,startY:y+3,head:[['Komponen','Total','Porsi',...R.act.map(k=>nm(k)+' / unit')]],
+    body:[...rows.map(r=>[r[0],M(pv(r[1])),pc(pv(r[1])/R.tot),...R.act.map(k=>rp(tv(r[1],R.tp[k])/R.tp[k].N))]),['TOTAL HPP',M(R.tot),'100%',...R.act.map(k=>rp(R.tp[k].hpp))]],
+    columnStyles:ra(3+R.act.length),didParseCell:c=>{if(c.section==='body'&&c.row.index===rows.length)c.cell.styles.fontStyle='bold'}});
+  if(S.km==='detail'){y=doc.lastAutoTable.finalY+9;doc.setFont('helvetica','bold');doc.setFontSize(12);doc.text('RAB pekerjaan kawasan',14,y);doc.setFont('helvetica','normal');
+    const body=[];GR.forEach((g,gi)=>{const its=S.d.filter(x=>x.g===gi&&x.v*x.h);body.push([{content:(gi+1)+'. '+g,colSpan:4,styles:{fontStyle:'bold'}},{content:rp(its.reduce((a,x)=>a+x.v*x.h,0)),styles:{fontStyle:'bold',halign:'right'}}]);body[body.length-1][1].content=rp(S.d.filter(x=>x.g===gi).reduce((a,x)=>a+x.v*x.h,0));its.forEach(x=>body.push(['   '+Q(x.u),Q(nf(x.v,2)+' '+x.s),'',rp(x.h),rp(x.v*x.h)]))});
+    body.push([{content:'TOTAL PEKERJAAN KAWASAN',colSpan:4,styles:{fontStyle:'bold'}},{content:rp(R.dsum),styles:{fontStyle:'bold',halign:'right'}}]);
+    doc.autoTable({...base,startY:y+3,head:[['Uraian','Volume','','Harga satuan','Jumlah']],body,columnStyles:{1:{halign:'right'},3:{halign:'right'},4:{halign:'right'}}})}
+  y=doc.lastAutoTable.finalY+8;if(y>275){doc.addPage();y=20}
+  doc.setFontSize(8);doc.setTextColor(90);
+  doc.text(doc.splitTextToSize(Q('Dasar hitung: tanah '+rp(S.hT)+'/m² dan perizinan '+rp(S.hI)+'/m² dari lahan bruto; kawasan '+({unit:rp(S.Ku)+'/unit',m2:rp(S.Km)+'/m² lahan',total:'total proyek',detail:'RAB per item'}[S.km])+'. Tanah, perizinan, BPHTB dan kawasan dibagi ke tiap tipe sesuai porsi luas kavling (unit × LT). Target margin kotor '+nf(S.tg,1)+'%. HPP belum termasuk funding, overhead dan pajak.'),W-28),14,y);
+  return doc.output('blob');
+}
+async function doExport(kind,btn){
+  const R=ready();if(!R)return;const old=btn.textContent;btn.disabled=true;btn.textContent='Menyiapkan…';
+  try{
+    if(kind==='x'){await loadJs('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js');await saveFile(fname('xlsx'),buildXlsx(R))}
+    else{await loadJs('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');await loadJs('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');await saveFile(fname('pdf'),buildPdf(R))}
+  }catch(e){toast((e&&e.message)||'Gagal membuat file',4000)}
+  finally{btn.disabled=false;btn.textContent=old}
+}
+$('bXls').addEventListener('click',e=>doExport('x',e.currentTarget));
+$('bPdf').addEventListener('click',e=>doExport('p',e.currentTarget));
+window._x={buildXlsx,buildPdf,model};
 renderForm();calc();
 window._t={get S(){return S},set S(v){S=v},model,calc};
 }
