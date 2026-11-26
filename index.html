@@ -95,6 +95,19 @@ tr.hit td{background:var(--hit)}
 @media(max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}.read{position:static}}
 @media(max-width:600px){.fields{grid-template-columns:minmax(0,1fr)}.ri{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 40px;padding-bottom:8px;border-bottom:1px solid var(--line)}.ri .u{grid-column:1/3}.ri .j{grid-column:1/3;text-align:left}.rh{display:none}table{font-size:13px}.stack thead{display:none}.stack tr{display:grid;padding-block:10px;border-bottom:1px solid var(--line)}.stack td{display:flow-root;border:0;padding:3px 0;padding-inline-start:9em;text-align:start}.stack td::before{content:attr(data-l);float:inline-start;width:8.5em;margin-inline-start:-9em;white-space:normal;color:var(--mute)}.stack td:empty{display:none}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+
+.footer{
+  text-align:center;
+  padding:24px 16px;
+  color:var(--mute);
+  font-size:12px;
+  border-top:1px solid var(--line);
+  margin-top:24px;
+}
+.footer p{margin:3px 0}
+
+   
 </style>
 <script>new MutationObserver(()=>{for(const c of document.querySelectorAll('.stack td:not([data-l])')){let i=0,p=c;while(p=p.previousElementSibling)i+=p.colSpan;c.dataset.l=c.closest('table').rows[0].cells[i]?.textContent||''}}).observe(document,{childList:true,subtree:true})</script>
 </head>
@@ -383,5 +396,13 @@ renderForm();calc();
 window._t={get S(){return S},set S(v){S=v},model,calc};
 }
 </script>
+
+
+<footer class="footer">
+  <p>© 2026 SARAYA, Yohanes Ciputra. All Rights Reserved.</p>
+  <p>Kalkulator HPP Developer · Version 1.0</p>
+</footer>
+
+   
 </body>
 </html>
